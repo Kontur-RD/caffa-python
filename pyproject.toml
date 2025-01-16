@@ -15,7 +15,7 @@ maintainers = [
 ]
 classifiers = [
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: LGPL License",
+  "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
 ]
@@ -25,6 +25,6 @@ dependencies = ["requests"]
 dev = ["pytest"]
 
 [project.urls]
-"Homepage" = "https://github.com/lindkvis/caffa-python"
-"Bug Reports" = "https://github.com/lindkvis/caffa-python/issues"
-"Source" = "https://github.com/lindkvis/caffa-python"
+"Homepage" = "https://github.com/Kontur-RD/caffa-python"
+"Bug Reports" = "https://github.com/Kontur-RD/caffa-python/issues"
+"Source" = "https://github.com/Kontur-RD/caffa-python"
