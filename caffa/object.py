@@ -56,10 +56,6 @@ class Object(object):
             setattr(self, method.static_name(), method_instance)
             self._method_list.append(method_instance)
 
-    @classmethod
-    def create(cls, **kwargs):
-        return cls(json_object=kwargs, client=None, local=True)
-
     @property
     def keyword(self):
         return self._fields["keyword"]
@@ -82,7 +78,7 @@ class Object(object):
         return content
 
     def to_json(self):
-        return json.dumps(self.to_dict())
+        return json.loads(self.to_string())
 
     def field_keywords(self):
         keywords = []
@@ -114,11 +110,14 @@ class Object(object):
 
     def set(self, field_keyword, value):
         if isinstance(value, Object):
-            value = object.to_json()
+            value = value.to_json()
         if not self._local:
             self._client.set_field_value(self.uuid, field_keyword, value)
         else:
-            self._fields[field_keyword]["value"] = value
+            if hasattr(self._fields[field_keyword], "value"):
+                self._fields[field_keyword]["value"] = value
+            else:
+                self._fields[field_keyword] = value
 
     def create_field(self, keyword, type, value):
         self._fields[keyword] = {"type": type, "value": value}
@@ -133,8 +132,8 @@ class Object(object):
     def methods(self):
         return self._method_list
 
-    def dump(self):
-        return json.dumps(self.to_json())
+    def to_string(self):
+        return json.dumps(self.to_dict())
 
     def raise_write_exception(self, property_name):
         raise AttributeError("Property " + property_name + " is read only!")
