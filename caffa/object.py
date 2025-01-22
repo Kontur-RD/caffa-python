@@ -25,9 +25,6 @@ from .method import create_method_class
 class Object(object):
     _log = logging.getLogger("caffa-object")
 
-    _methods = []
-    __frozen = False
-
     @classmethod
     def prep_attributes(cls):
         setattr(cls, "_fields", None)
@@ -162,6 +159,8 @@ def create_class(name, schema_properties):
         Object.__init__(self, json_object, client, local)
 
     newclass = type(name, (Object,), {"__init__": __init__})
+    newclass._methods = []
+    newclass.__frozen = False
 
     for property_name, prop in schema_properties.items():
         if property_name != "keyword" and property_name != "methods":

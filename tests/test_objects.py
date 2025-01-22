@@ -92,6 +92,16 @@ class TestObjects(object):
 
         assert values == [1, 2, 97]
 
+    def test_methods_in_unrelated_object(self):
+        doc = self.testApp.document("testDocument")
+        unrelated_object = doc.createUnrelatedObject()
+        obj_methods = unrelated_object.methods()
+
+        for method in obj_methods:
+            print("Found method: ", method.name(), dir(method))
+
+        assert len(obj_methods) == 1
+
     def test_non_existing_field(self):
         doc = self.testApp.document("testDocument")
         assert doc is not None
