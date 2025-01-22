@@ -33,7 +33,6 @@ class Object(object):
         setattr(cls, "_method_list", None)
         for method in cls._methods:
             setattr(cls, method.static_name(), None)
-        cls.__frozen = True
 
     def __init__(self, json_object="", client=None, local=False):
         if isinstance(json_object, dict):
@@ -53,12 +52,19 @@ class Object(object):
             setattr(self, method.static_name(), method_instance)
             self._method_list.append(method_instance)
 
+        # Avoid the custom __setattr__() method
+        object.__setattr__(self, "__instantiated", True)
+
+    def __is_instantiated(self):
+        return hasattr(self, "__instantiated") and getattr(self, "__instantiated")
+
     @property
     def keyword(self):
         return self._fields["keyword"]
 
     def __setattr__(self, key, value):
-        if not hasattr(self, key) and self.__class__.__frozen:
+        # Do not allow new attributes to be set on objects that are instantiated
+        if not hasattr(self, key) and self.__is_instantiated():
             raise TypeError("%r does not have the property %s", self, key)
         object.__setattr__(self, key, value)
 
@@ -160,7 +166,6 @@ def create_class(name, schema_properties):
 
     newclass = type(name, (Object,), {"__init__": __init__})
     newclass._methods = []
-    newclass.__frozen = False
 
     for property_name, prop in schema_properties.items():
         if property_name != "keyword" and property_name != "methods":
