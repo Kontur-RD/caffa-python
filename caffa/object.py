@@ -26,12 +26,20 @@ class Object(object):
     _log = logging.getLogger("caffa-object")
 
     @classmethod
+    def class_methods(cls):
+        cls_methods = []
+        if hasattr(cls, "_methods"):
+            for method in cls._methods:
+                cls_methods.append(method)
+        return cls_methods
+
+    @classmethod
     def prep_attributes(cls):
         setattr(cls, "_fields", None)
         setattr(cls, "_client", None)
         setattr(cls, "_local", None)
         setattr(cls, "_method_list", None)
-        for method in cls._methods:
+        for method in cls.class_methods():
             setattr(cls, method.static_name(), None)
 
     def __init__(self, json_object="", client=None, local=False):
@@ -47,7 +55,7 @@ class Object(object):
             assert self._client is not None
 
         self._method_list = []
-        for method in self.__class__._methods:
+        for method in self.__class__.class_methods():
             method_instance = method(self_object=self)
             setattr(self, method.static_name(), method_instance)
             self._method_list.append(method_instance)
