@@ -25,8 +25,7 @@ import time
 from enum import IntEnum
 from types import SimpleNamespace
 
-from .object import Object
-from .object_creator import create_class, create_method_class
+from .object_creator import create_class
 
 # Update the (x, y, z) tuple to match minimum required version (0, 6, 4) means minimum 0.6.4
 # By default we try to match the caffa-version
