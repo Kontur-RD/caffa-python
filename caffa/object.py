@@ -19,30 +19,33 @@
 import json
 import logging
 
-from .method import create_method_class
-
 
 class Object(object):
+    """
+    A wrapper class for a JSON-backed object received from a Caffa Rest Interface.
+    The object will dynamically be assigned Python attributes (fields) based on the JSON schemas provided by the server.
+
+    If the underlying JSON object contains an attribute "test_string" it can be read like:
+    print(object.test_string)
+    ... or assigned like
+    object.test_string = "a test string"
+
+    The Caffa Objects will also dynamically get assigned methods based on the JSON content by the server.
+    The names of these can be accessed with the methods() method.
+    """
+
     _log = logging.getLogger("caffa-object")
 
-    @classmethod
-    def class_methods(cls):
-        cls_methods = []
-        if hasattr(cls, "_methods"):
-            for method in cls._methods:
-                cls_methods.append(method)
-        return cls_methods
-
-    @classmethod
-    def prep_attributes(cls):
-        setattr(cls, "_fields", None)
-        setattr(cls, "_client", None)
-        setattr(cls, "_local", None)
-        setattr(cls, "_method_list", None)
-        for method in cls.class_methods():
-            setattr(cls, method.static_name(), None)
-
     def __init__(self, json_object="", client=None, local=False):
+        """
+        Initialise the object with a dict or JSON string and optionally a client connection.
+        Caffa Objects are not generally created by the user. Instead they are returned by the RestClient class.
+
+        Args:
+            json_object: A dict or JSON string
+            client: A rest-client object
+            local: True if the object has locally stored attributes. False read remotely
+        """
         if isinstance(json_object, dict):
             self._fields = json_object
         else:
@@ -55,49 +58,41 @@ class Object(object):
             assert self._client is not None
 
         self._method_list = []
-        for method in self.__class__.class_methods():
-            method_instance = method(self_object=self)
-            setattr(self, method.static_name(), method_instance)
-            self._method_list.append(method_instance)
+        if hasattr(self.__class__, "_methods"):
+            for method in self.__class__._methods:
+                method_instance = method(self_object=self)
+                setattr(self, method_instance.name(), method_instance)
+                self._method_list.append(method_instance)
 
         # Avoid the custom __setattr__() method
         object.__setattr__(self, "__instantiated", True)
 
-    def __is_instantiated(self):
-        return hasattr(self, "__instantiated") and getattr(self, "__instantiated")
-
     @property
     def keyword(self):
+        """
+        The class keyword of the object
+
+        Returns:
+            A keyword string
+        """
         return self._fields["keyword"]
 
-    def __setattr__(self, key, value):
-        # Do not allow new attributes to be set on objects that are instantiated
-        if not hasattr(self, key) and self.__is_instantiated():
-            raise TypeError("%r does not have the property %s", self, key)
-        object.__setattr__(self, key, value)
-
-    def client(self):
-        return self._client
-
-    def to_dict(self):
-        content = {}
-        for key in self._fields:
-            value = self.get(key)
-            if isinstance(value, Object):
-                value = value.to_dict()
-            content[key] = value
-        return content
-
-    def to_json(self):
-        return json.loads(self.to_string())
-
-    def field_keywords(self):
-        keywords = []
-        for keyword in self._fields:
-            keywords.append(keyword)
-        return keywords
-
     def get(self, field_keyword):
+        """
+        Get an attribute of the JSON object. This will be called when accessing the field as an attribute
+        value = object.field_keyword
+
+        Args:
+            field_keyword: The name of the attribute
+
+        Returns:
+            The value of the attribute. Can be any JSON backed type or another Caffa Object
+
+        Raises:
+            RuntimeError: If the field does not exist or is not readable
+        """
+        from .object_creator import create_class
+
         value = None
         if not self._local and field_keyword != "keyword" and field_keyword != "uuid":
             value = json.loads(
@@ -120,6 +115,17 @@ class Object(object):
         return value
 
     def set(self, field_keyword, value):
+        """
+        Set an attribute of the JSON object
+
+        Args:
+            field_keyword: The name of the attribute
+            value: The value of the attribute. Can be any JSON backed type or another Caffa Object
+
+        Raises:
+            RuntimeError: If the field does not exist or is not writable
+        """
+
         if isinstance(value, Object):
             value = value.to_json()
         if not self._local:
@@ -130,77 +136,66 @@ class Object(object):
             else:
                 self._fields[field_keyword] = value
 
-    def create_field(self, keyword, type, value):
-        self._fields[keyword] = {"type": type, "value": value}
+    def _execute(self, object_method, arguments):
+        """
+        PRIVATE: Execute an object method. Used internally by caffa
 
-    def set_fields(self, **kwargs):
-        for key, value in kwargs.items():
-            self.set(key, value)
+        Args:
+          object_method: The method object
+          arguments: The list of arguments
 
-    def execute(self, object_method, arguments):
-        return self.client().execute(self.uuid, object_method.name(), arguments)
+          Raises:
+              RuntimeError: If the method does not exist or fails to execute on the server
+        """
+        return self._client.execute(self.uuid, object_method.name(), arguments)
 
     def methods(self):
+        """
+        Get a list of methods available to run on the object
+
+        Returns:
+            A list of methods (Caffa Method object)
+        """
         return self._method_list
 
+    def to_dict(self):
+        """
+        Create a Python dictionary representation of the object with key/value pairs
+
+        Returns:
+            Python dictionary
+        """
+        content = {}
+        for key in self._fields:
+            value = self.get(key)
+            if isinstance(value, Object):
+                value = value.to_dict()
+            content[key] = value
+        return content
+
+    def to_json(self):
+        """
+        Get a Python JSON representation of the Caffa object
+
+        Returns:
+            A Python JSON object
+        """
+        return json.loads(self.to_string())
+
     def to_string(self):
+        """
+        Get a JSON string representation of the Caffa object
+
+        Return:
+            A JSON string
+        """
         return json.dumps(self.to_dict())
 
-    def raise_write_exception(self, property_name):
-        raise AttributeError("Property " + property_name + " is read only!")
+    def __is_instantiated(self):
+        return hasattr(self, "__instantiated") and getattr(self, "__instantiated")
 
-
-def make_read_lambda(property_name):
-    return lambda self: self.get(property_name)
-
-
-# Dummy read lambda used to avoid a proper caffa read call when asking
-# for a write-only attribute
-def make_dummy_read_lambda(property_name):
-    return lambda self: None
-
-
-def make_write_lambda(property_name):
-    return lambda self, value: self.set(property_name, value)
-
-
-def make_error_write_lambda(property_name):
-    return lambda self, value: self.raise_write_exception(property_name)
-
-
-def create_class(name, schema_properties):
-    def __init__(self, json_object="", client=None, local=False):
-        Object.__init__(self, json_object, client, local)
-
-    newclass = type(name, (Object,), {"__init__": __init__})
-    newclass._methods = []
-
-    for property_name, prop in schema_properties.items():
-        if property_name != "keyword" and property_name != "methods":
-            read_only = "readOnly" in prop and prop["readOnly"]
-            write_only = "writeOnly" in prop and prop["writeOnly"]
-
-            read_lambda = make_dummy_read_lambda(property_name)
-            write_lambda = make_error_write_lambda(property_name)
-
-            if not write_only:
-                read_lambda = make_read_lambda(property_name)
-            if not read_only:
-                write_lambda = make_write_lambda(property_name)
-
-            setattr(
-                newclass,
-                property_name,
-                property(
-                    fget=read_lambda,
-                    fset=write_lambda,
-                ),
-            )
-        elif property_name == "methods":
-            for method_name, method_schema in prop["properties"].items():
-                method_schema = method_schema["properties"]
-                newclass._methods.append(
-                    create_method_class(method_name, method_schema)
-                )
-    newclass.prep_attributes()
-    return newclass
+    def __setattr__(self, key, value):
+        # Do not allow new attributes to be set on objects that are instantiated
+        if not hasattr(self, key) and self.__is_instantiated():
+            raise TypeError("%r does not have the property %s", self, key)
+        object.__setattr__(self, key, value)
