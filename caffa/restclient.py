@@ -25,7 +25,8 @@ import time
 from enum import IntEnum
 from types import SimpleNamespace
 
-from . import object
+from .object import Object
+from .object_creator import create_class, create_method_class
 
 # Update the (x, y, z) tuple to match minimum required version (0, 6, 4) means minimum 0.6.4
 # By default we try to match the caffa-version
@@ -191,7 +192,7 @@ class RestClient:
             schema_location = self.schema_location_from_keyword(keyword)
 
         schema_properties = self.schema_properties(schema_location)
-        cls = object.create_class(keyword, schema_properties)
+        cls = create_class(keyword, schema_properties)
         local_object = cls(json_object, self, True)
         return local_object
 
@@ -238,7 +239,7 @@ class RestClient:
                 else:
                     schema_location = self.schema_location_from_keyword(keyword)
                 schema_properties = self.schema_properties(schema_location)
-                cls = object.create_class(keyword, schema_properties)
+                cls = create_class(keyword, schema_properties)
                 return cls(value, self, True)
 
         return value
@@ -288,7 +289,7 @@ class RestClient:
             schema_location = self.schema_location_from_keyword(keyword)
 
         schema_properties = self.schema_properties(schema_location)
-        cls = object.create_class(keyword, schema_properties)
+        cls = create_class(keyword, schema_properties)
 
         return cls(json_text, self, False)
 

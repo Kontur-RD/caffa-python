@@ -20,6 +20,10 @@ import logging
 
 
 class Method:
+    """
+    A class representing a remote procedure call that can be run on a Caffa Object
+    """
+
     _log = logging.getLogger("caffa-method")
     _labelled_arguments = {}
     _positional_arguments = {}
@@ -48,36 +52,13 @@ class Method:
                     value = value.to_dict()
                 arguments["positionalArguments"][i] = value
 
-        return self._self_object.execute(self, arguments)
-
-    @classmethod
-    def static_name(cls):
-        return cls.__name__
+        return self._self_object._execute(self, arguments)
 
     def name(self):
+        """
+        Get the name of the method
+
+        Returns:
+            String containing the method name
+        """
         return self.__class__.__name__
-
-
-def make_read_lambda(property_name):
-    return lambda self: self._self_object.get(property_name)
-
-
-def make_write_lambda(property_name):
-    return lambda self, value: self.set(property_name, value)
-
-
-def create_method_class(name, schema):
-    def __init__(self, self_object):
-        return Method.__init__(self, self_object)
-
-    newclass = type(name, (Method,), {"__init__": __init__})
-    newclass._labelled_arguments[name] = {}
-    newclass._positional_arguments[name] = []
-    if "labelledArguments" in schema:
-        for argument_name in schema["labelledArguments"]["properties"]:
-            newclass._labelled_arguments[name][argument_name] = None
-    if "positionalArguments" in schema:
-        for i, entry in enumerate(schema["positionalArguments"]["items"]):
-            newclass._positional_arguments[name].append(None)
-
-    return newclass
