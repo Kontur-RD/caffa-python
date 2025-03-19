@@ -61,6 +61,7 @@ class RestClient:
 
         self.log = logging.getLogger("rpc-logger")
         self.mutex = threading.Lock()
+        self.__connection_error = False
 
         version_status = True
         errmsg = ""
@@ -116,6 +117,9 @@ class RestClient:
         return url
 
     def _perform_get_request(self, path, params=""):
+        if self.__connection_error:
+            raise RuntimeError("Got a connection error. Dropping GET request to {}".format(self.hostname))
+
         url = self._build_url(path, params)
         try:
             response = requests.get(url, auth=self.basic_auth)
@@ -129,6 +133,9 @@ class RestClient:
             raise RuntimeError("Failed GET request with error %s" % e) from None
 
     def _perform_options_request(self, path, params=""):
+        if self.__connection_error:
+            raise RuntimeError("Got a connection error. Dropping OPTIONS request to {}{}".format(self.hostname, path))
+
         url = self._build_url(path, params)
         try:
             response = requests.options(url, auth=self.basic_auth)
@@ -142,6 +149,10 @@ class RestClient:
             raise RuntimeError("Failed OPTIONS request with error %s" % e) from None
 
     def _perform_delete_request(self, path, params):
+        if self.__connection_error:
+            self.log.error("Got a connection error. Dropping DELETE request to {}{}".format(self.hostname, path))
+            return None
+
         url = self._build_url(path, params)
         try:
             response = requests.delete(url, auth=self.basic_auth)
@@ -155,6 +166,9 @@ class RestClient:
             raise RuntimeError("Failed DELETE request with error %s" % e) from None
 
     def _perform_put_request(self, path, params="", body=""):
+        if self.__connection_error:
+            raise RuntimeError("Got a connection error. Dropping PUT request to {}{}".format(self.hostname, path))
+
         url = self._build_url(path, params)
         try:
             response = requests.put(url, json=body, auth=self.basic_auth)
@@ -168,6 +182,9 @@ class RestClient:
             raise RuntimeError("Failed PUT request with error %s" % e) from None
 
     def _perform_post_request(self, path, params="", body=""):
+        if self.__connection_error:
+            raise RuntimeError("Got a connection error. Dropping POST request to {}{}".format(self.hostname, path))
+
         url = self._build_url(path, params)
         try:
             response = requests.post(url, json=body, auth=self.basic_auth)
@@ -175,10 +192,9 @@ class RestClient:
             return response.text
         except requests.exceptions.HTTPError as e:
             self.log.error("Failed POST request with error " + e.response.text)
-            raise e
-        except requests.exceptions.RequestException as e:
-            self.log.error("Failed POST request with error ", e)
-            raise e
+            raise RuntimeError("Failed POST request with error %s" % e.response.text)
+        except Exception as e:
+            raise RuntimeError("Failed POST request with error %s" % e) from None
 
     def _json_text_to_object(self, text):
         return json.loads(text, object_hook=lambda d: SimpleNamespace(**d))
@@ -270,8 +286,18 @@ class RestClient:
                     break
                 else:
                     self.send_keepalive()
+            except Exception as e:
+                self.__connection_error = True
+                break
             finally:
                 self.mutex.release()
+
+    def has_connection_error(self):
+        try:
+            self.mutex.acquire()
+            return self.__connection_error
+        finally:
+            self.mutex.release()
 
     def document(self, document_id):
         assert len(document_id) > 0
