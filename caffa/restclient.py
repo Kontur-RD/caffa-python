@@ -44,6 +44,8 @@ class SessionType(IntEnum):
 class RestClient:
     number_of_attempts = 1
     delay_between_attempts = 0.5
+    keepalive_interval = 0.5
+    max_retries = 20
 
     def __init__(
         self,
@@ -61,7 +63,7 @@ class RestClient:
 
         self.log = logging.getLogger("rpc-logger")
         self.mutex = threading.Lock()
-        self.__connection_error = False
+        self.__connection_errors = 0
 
         version_status = True
         errmsg = ""
@@ -117,7 +119,7 @@ class RestClient:
         return url
 
     def _perform_get_request(self, path, params=""):
-        if self.__connection_error:
+        if self.__connection_errors >= RestClient.max_retries:
             raise RuntimeError("Got a connection error. Dropping GET request to {}".format(self.hostname))
 
         url = self._build_url(path, params)
@@ -133,7 +135,7 @@ class RestClient:
             raise RuntimeError("Failed GET request with error %s" % e) from None
 
     def _perform_options_request(self, path, params=""):
-        if self.__connection_error:
+        if self.__connection_errors >= RestClient.max_retries:
             raise RuntimeError("Got a connection error. Dropping OPTIONS request to {}{}".format(self.hostname, path))
 
         url = self._build_url(path, params)
@@ -149,7 +151,7 @@ class RestClient:
             raise RuntimeError("Failed OPTIONS request with error %s" % e) from None
 
     def _perform_delete_request(self, path, params):
-        if self.__connection_error:
+        if self.__connection_errors >= RestClient.max_retries:
             self.log.error("Got a connection error. Dropping DELETE request to {}{}".format(self.hostname, path))
             return None
 
@@ -166,7 +168,7 @@ class RestClient:
             raise RuntimeError("Failed DELETE request with error %s" % e) from None
 
     def _perform_put_request(self, path, params="", body=""):
-        if self.__connection_error:
+        if self.__connection_errors >= RestClient.max_retries:
             raise RuntimeError("Got a connection error. Dropping PUT request to {}{}".format(self.hostname, path))
 
         url = self._build_url(path, params)
@@ -182,7 +184,7 @@ class RestClient:
             raise RuntimeError("Failed PUT request with error %s" % e) from None
 
     def _perform_post_request(self, path, params="", body=""):
-        if self.__connection_error:
+        if self.__connection_errors >= RestClient.max_retries:
             raise RuntimeError("Got a connection error. Dropping POST request to {}{}".format(self.hostname, path))
 
         url = self._build_url(path, params)
@@ -279,23 +281,25 @@ class RestClient:
 
     def send_keepalives(self):
         while True:
-            time.sleep(0.5)
+            time.sleep(RestClient.keepalive_interval)
             try:
                 self.mutex.acquire()
                 if not self.keep_alive:
                     break
                 else:
                     self.send_keepalive()
+                    self.__connection_errors = 0
             except Exception as e:
-                self.__connection_error = True
-                break
+                self.__connection_errors += 1
+                if self.__connection_errors >= RestClient.max_retries:
+                    break
             finally:
                 self.mutex.release()
 
     def has_connection_error(self):
         try:
             self.mutex.acquire()
-            return self.__connection_error
+            return self.__connection_errors >= RestClient.max_retries
         finally:
             self.mutex.release()
 
