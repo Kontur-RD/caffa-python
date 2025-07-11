@@ -39,6 +39,7 @@ class SessionType(IntEnum):
     INVALID = 0
     REGULAR = 1
     OBSERVING = 2
+    DENIED = 3
 
 
 class RestClient:
