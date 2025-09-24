@@ -87,12 +87,12 @@ class RestClient:
                     )
                     time.sleep(RestClient.delay_between_attempts)
         if not version_status:
-            raise RuntimeError(errmsg)
+            raise RuntimeError(errmsg) from None
 
         self.session_uuid = self.create_session(session_type)
 
         if not self.session_uuid:
-            raise RuntimeError("Failed to create session")
+            raise RuntimeError("Failed to create session") from None
         self.log.debug("Session uuid: %s", self.session_uuid)
         self.keep_alive = True
         self.keepalive_thread = threading.Thread(target=self.send_keepalives)
@@ -121,7 +121,11 @@ class RestClient:
 
     def _perform_get_request(self, path, params=""):
         if self.__connection_errors >= RestClient.max_retries:
-            raise RuntimeError("Got a connection error. Dropping GET request to {}".format(self.hostname))
+            raise RuntimeError(
+                "Got a connection error. Dropping GET request to {}".format(
+                    self.hostname
+                )
+            ) from None
 
         url = self._build_url(path, params)
         try:
@@ -130,14 +134,18 @@ class RestClient:
             return response.text
         except requests.exceptions.HTTPError as e:
             raise RuntimeError(
-                "Failed GET request with error %s" % e.response.text
+                f"Failed GET request with error {e.response.text}"
             ) from None
         except requests.exceptions.RequestException as e:
-            raise RuntimeError("Failed GET request with error %s" % e) from None
+            raise RuntimeError(f"Failed GET request with error {str(e)}") from None
 
     def _perform_options_request(self, path, params=""):
         if self.__connection_errors >= RestClient.max_retries:
-            raise RuntimeError("Got a connection error. Dropping OPTIONS request to {}{}".format(self.hostname, path))
+            raise RuntimeError(
+                "Got a connection error. Dropping OPTIONS request to {}{}".format(
+                    self.hostname, path
+                )
+            ) from None
 
         url = self._build_url(path, params)
         try:
@@ -146,14 +154,16 @@ class RestClient:
             return response.text
         except requests.exceptions.HTTPError as e:
             raise RuntimeError(
-                "Failed OPTIONS request with error %s" % e.response.text
+                f"Failed OPTIONS request with error {e.response.text}"
             ) from None
         except requests.exceptions.RequestException as e:
-            raise RuntimeError("Failed OPTIONS request with error %s" % e) from None
+            raise RuntimeError(f"Failed OPTIONS request with error {str(e)}") from None
 
     def _perform_delete_request(self, path, params):
         if self.__connection_errors >= RestClient.max_retries:
-            self.log.error("Got a connection error. Dropping DELETE request to {}{}".format(self.hostname, path))
+            self.log.error(
+                f"Got a connection error. Dropping DELETE request to {self.hostname}{path}"
+            )
             return None
 
         url = self._build_url(path, params)
@@ -163,14 +173,16 @@ class RestClient:
             return response.text
         except requests.exceptions.HTTPError as e:
             raise RuntimeError(
-                "Failed DELETE request with error %s" % e.response.text
+                f"Failed DELETE request with error {e.response.text}"
             ) from None
         except Exception as e:
-            raise RuntimeError("Failed DELETE request with error %s" % e) from None
+            raise RuntimeError(f"Failed DELETE request with error {str(e)}") from None
 
     def _perform_put_request(self, path, params="", body=""):
         if self.__connection_errors >= RestClient.max_retries:
-            raise RuntimeError("Got a connection error. Dropping PUT request to {}{}".format(self.hostname, path))
+            raise RuntimeError(
+                f"Got a connection error. Dropping PUT request to {self.hostname}{path}"
+            ) from None
 
         url = self._build_url(path, params)
         try:
@@ -179,14 +191,18 @@ class RestClient:
             return response.text
         except requests.exceptions.HTTPError as e:
             raise RuntimeError(
-                "Failed PUT request with error %s" % e.response.text
+                f"Failed PUT request with error {e.response.text}"
             ) from None
         except Exception as e:
-            raise RuntimeError("Failed PUT request with error %s" % e) from None
+            raise RuntimeError(f"Failed PUT request with error {str(e)}") from None
 
     def _perform_post_request(self, path, params="", body=""):
         if self.__connection_errors >= RestClient.max_retries:
-            raise RuntimeError("Got a connection error. Dropping POST request to {}{}".format(self.hostname, path))
+            raise RuntimeError(
+                "Got a connection error. Dropping POST request to {}{}".format(
+                    self.hostname, path
+                )
+            ) from None
 
         url = self._build_url(path, params)
         try:
@@ -194,10 +210,11 @@ class RestClient:
             response.raise_for_status()
             return response.text
         except requests.exceptions.HTTPError as e:
-            self.log.error("Failed POST request with error " + e.response.text)
-            raise RuntimeError("Failed POST request with error %s" % e.response.text)
+            error = f"Failed POST request with error {e.response.text}"
+            self.log.error(error)
+            raise RuntimeError(error) from None
         except Exception as e:
-            raise RuntimeError("Failed POST request with error %s" % e) from None
+            raise RuntimeError(f"Failed POST request with error: {str(e)}") from None
 
     def _json_text_to_object(self, text):
         return json.loads(text, object_hook=lambda d: SimpleNamespace(**d))
