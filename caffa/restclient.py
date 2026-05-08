@@ -45,8 +45,8 @@ class SessionType(IntEnum):
 class RestClient:
     number_of_attempts = 1
     delay_between_attempts = 0.5
-    keepalive_interval = 0.5
-    max_retries = 20
+    keepalive_interval = 2.0
+    max_retries = 8
 
     def __init__(
         self,
